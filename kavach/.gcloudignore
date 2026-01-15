@@ -1,0 +1,9 @@
+mcp_server/
+whatsApp_webhook/
+agents/
+tools/
+.git/
+__pycache__/
+*.pyc
+.venv/
+.env

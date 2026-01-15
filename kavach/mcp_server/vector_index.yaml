@@ -1,0 +1,16 @@
+indexes:
+  - collectionGroup: departments
+    queryScope: COLLECTION
+    fields:
+      # Vector embedding field
+      - fieldPath: embedding
+        vectorConfig:
+          dimension: 768        # MUST match embedding model output
+          distanceMeasure: COSINE
+
+      # Optional filters / ordering (recommended)
+      - fieldPath: department_name
+        order: ASCENDING
+
+      - fieldPath: department_id
+        order: ASCENDING

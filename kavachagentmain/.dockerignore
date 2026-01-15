@@ -1,0 +1,6 @@
+.env
+deploy.ps1
+__pycache__
+*.pyc
+.adk/
+

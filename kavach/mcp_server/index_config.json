@@ -1,0 +1,13 @@
+{
+    "config": {
+        "dimensions": 768,
+        "approximateNeighborsCount": 100,
+        "distanceMeasureType": "DOT_PRODUCT_DISTANCE",
+        "algorithmConfig": {
+            "treeAhConfig": {
+                "leafNodeEmbeddingCount": 1000,
+                "leafNodesToSearchPercent": 7
+            }
+        }
+    }
+}

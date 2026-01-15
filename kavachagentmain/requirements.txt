@@ -1,0 +1,16 @@
+# Web Server
+fastapi
+uvicorn
+python-multipart
+
+# AI & Google SDKs
+google-adk>=1.20.0
+google-cloud-aiplatform[adk,agent_engines,preview]>=1.75.0
+vertexai
+
+# Utilities
+requests
+python-dotenv
+cloudpickle==3.0.0
+
+# REMOVED: pywin32 (Not compatible with Linux/Cloud Run)

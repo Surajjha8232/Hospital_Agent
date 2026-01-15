@@ -1,0 +1,133 @@
+PS C:\Users\Suraj S. Jha\Downloads\Hospital_Agent\kavach\mcp_server> .\deploy.ps1
+Deploying hospital-mcp-server to Cloud Run in us-central1...
+Using environment variables: PG_HOST=34.41.136.230,PG_PORT=5432,PG_DATABASE=Hospital_DB,PG_USER=postgres,PG_PASSWORD=postgre123
+The following APIs are not enabled on project [kumaraiagent]:
+        run.googleapis.com
+
+Do you want enable these APIs to continue (this will take a few minutes)? (Y/n)?  Y
+
+Enabling APIs on project [kumaraiagent]...
+Operation "operations/acf.p2-329414521619-de64f9cd-1ccc-4055-b082-fe83437e337b" finished successfully.
+Deploying from source requires an Artifact Registry Docker repository to store built containers. A 
+repository named [cloud-run-source-deploy] in region [us-central1] will be created.
+
+Do you want to continue (Y/n)?  Y
+
+Building using Dockerfile and deploying container to Cloud Run service [hospital-mcp-server] in project [kumaraiagent] region [us-central1]
+OK Building and deploying new service... Done.
+  OK Creating Container Repository...
+  OK Uploading sources...
+  OK Building Container... Logs are available at [https://console.cloud.google.com/cloud-build/builds
+  ;region=us-central1/e41a165e-a7fd-4499-b568-4abe22983e63?project=329414521619].
+  OK Creating Revision...
+  OK Routing traffic...
+  OK Setting IAM Policy...
+Done.
+Service [hospital-mcp-server] revision [hospital-mcp-server-00001-gcm] has been deployed and is serving 100 percent of traffic.
+Service URL: https://hospital-mcp-server-329414521619.us-central1.run.app
+Deployment successful!
+PS C:\Users\Suraj S. Jha\Downloads\Hospital_Agent\kavach\mcp_server> 
+
+Deploy the Index 
+
+check status 
+gcloud firestore indexes list
+
+gsutil mb -l us-central1 gs://kumarai-dept-vectors
+
+gsutil cp departments.jsonl gs://kumarai-dept-vectors/
+
+#Creating Matching Engine Index ID
+gcloud beta ai indexes create  
+   --display-name=hospital-departments 
+   --metadata-file=index_config.json 
+   --region=us-central1 
+   --project=kumaraiagent
+
+    Response : 
+    Using endpoint [https://us-central1-aiplatform.googleapis.com/]
+    The create index operation [projects/329414521619/locations/us-central1/indexes/822093848971837440/operations/8690217594415742976] was submitted successfully.
+    Index ID: 822093848971837440
+
+#Creating Endpoint 
+gcloud beta ai index-endpoints create 
+  --display-name=hospital-dept-endpoint 
+  --region=us-central1 
+  --project=kumaraiagent
+
+  Response:
+  Using endpoint [https://us-central1-aiplatform.googleapis.com/]
+  Waiting for operation [6426032881755226112]...done.
+  Created Vertex AI index endpoint: projects/329414521619/locations/us-central1/indexEndpoints/6093662765925269504.
+  Endpoint ID: 6093662765925269504
+
+#Deploying Endpoint
+gcloud beta ai index-endpoints deploy-index projects/329414521619/locations/us-central1/indexEndpoints/6093662765925269504
+  --deployed-index-id=dept_index 
+  --display-name=department-vector-search 
+  --index=822093848971837440 
+  --region=us-central1 
+  --project=kumaraiagent
+
+  Response: 
+  The deploy index operation [projects/329414521619/locations/us-central1/indexEndpoints/6093662765925269504/operations/6390004084736262144] was submitted successfully.
+
+  You may view the status of your operation with the command
+
+    $ gcloud ai operations describe 6390004084736262144 --index-endpoint=6093662765925269504 --region=us-central1 [--project=329414521619]
+  metadata:
+    '@type': type.googleapis.com/google.cloud.aiplatform.v1beta1.DeployIndexOperationMetadata
+    deployedIndexId: dept_index
+    genericMetadata:
+      createTime: '2026-01-13T20:24:48.089074Z'
+      updateTime: '2026-01-13T20:24:48.089074Z'
+  name: projects/329414521619/locations/us-central1/indexEndpoints/6093662765925269504/operations/6390004084736262144
+
+
+#Check Deployment Status
+gcloud beta ai operations describe 6390004084736262144 
+  --index-endpoint=6093662765925269504 
+  --region=us-central1 
+  --project=kumaraiagent
+
+  Response:
+  done:true //deployment successful 
+  metadata:
+    '@type': type.googleapis.com/google.cloud.aiplatform.v1beta1.DeployIndexOperationMetadata
+    deployedIndexId: dept_index
+    genericMetadata:
+      createTime: '2026-01-13T20:24:48.089074Z'
+      updateTime: '2026-01-13T20:24:48.089074Z'
+  name: projects/329414521619/locations/us-central1/indexEndpoints/6093662765925269504/operations/6390004084736262144
+
+
+gcloud beta ai indexes update 2170921937369300992 
+  --contents-delta-uri=gs://kumarai-dept-vectors/matching_engine.jsonl 
+  --region=us-central1 
+  --project=kumaraiagent
+
+
+#Undeploy the index
+  gcloud beta ai index-endpoints undeploy-index projects/329414521619/locations/us-central1/indexEndpoints/6093662765925269504 \
+  --deployed-index-id=dept_index \
+  --region=us-central1 \
+  --project=kumaraiagent
+
+#Delete the index 
+  gcloud beta ai indexes delete 2170921937369300992 \
+    --region=us-central1 \
+    --project=kumaraiagent
+
+
+
+15-01-2026
+Using Faiss instead of vector search 
+pip install faiss-cpu
+
+run below file to create index and pkl file inside data folder
+python build_faiss.py // generates index and pkl file
+python query_departments.py //helps to test the fn 
+
+creating mcp_faiss_server.py 
+uvicorn server:app --host 0.0.0.0 --port 3333
+

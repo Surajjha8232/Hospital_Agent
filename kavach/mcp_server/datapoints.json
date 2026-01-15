@@ -1,0 +1,9 @@
+{
+    "datapoints": {
+        "gcsSource": {
+            "uris": [
+                "gs://kumarai-dept-vectors/departments.jsonl"
+            ]
+        }
+    }
+}
