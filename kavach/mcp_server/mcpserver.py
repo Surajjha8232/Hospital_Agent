@@ -8,11 +8,14 @@ from vertexai.preview.language_models import TextEmbeddingModel
 import os
 from fastapi import FastAPI
 from fastmcp import FastMCP
-
-from department_lookup import department_lookup
-from doctor_lookup import get_doctors_by_department
-from schedule_lookup import get_doctor_schedule
-
+# from department_lookup import department_lookup
+# from doctor_lookup import get_doctors_by_department
+# from schedule_lookup import get_doctor_schedule
+# from auth import get_access_token
+import requests
+import time
+from threading import Lock
+from datetime import datetime
 # -----------------------------------------------------------------------------
 # Create MCP Server
 # -----------------------------------------------------------------------------
@@ -28,6 +31,75 @@ app = FastAPI(title="Hospital MCP Server")
 PROJECT_ID = "trans-opus-484315-h8"
 LOCATION = "us-central1"
 EMBEDDING_MODEL = "text-embedding-004"
+
+
+DOCTOR_LIST_URL = (
+    "https://wellness.bhaktivedantahospital.com/"
+    "appointmentApi/apptapi/data/doctorlist"
+)
+SCHEDULE_URL = (
+    "https://wellness.bhaktivedantahospital.com/"
+    "appointmentApi/apptapi/data/doctorschedule"
+)
+
+TOKEN_URL = "https://wellness.bhaktivedantahospital.com/appointmentApi/apptapi/token"
+API_KEY = "mpzqo-yAQB_5IygHeqwrDFoH_r3VQu6ZXV66kMb9pG4"
+
+_token_cache = {
+    "access_token": None,
+    "expires_at": 0
+}
+
+_lock = Lock()
+
+def _parse_expires_in(expires_in: str) -> int:
+    """
+    Converts expires_in like '1h', '30m' to seconds.
+    Default fallback: 3600 seconds
+    """
+    if isinstance(expires_in, str):
+        expires_in = expires_in.lower().strip()
+        if expires_in.endswith("h"):
+            return int(expires_in[:-1]) * 3600
+        if expires_in.endswith("m"):
+            return int(expires_in[:-1]) * 60
+
+    # fallback
+    return 3600
+
+def get_access_token() -> str:
+    """
+    Returns a valid token.
+    Automatically refreshes if expired.
+    """
+    with _lock:
+        now = time.time()
+
+        # Token still valid (keep 60s buffer)
+        if (
+            _token_cache["access_token"]
+            and now < _token_cache["expires_at"] - 60
+        ):
+            return _token_cache["access_token"]
+
+        # Fetch new token
+        response = requests.post(
+            TOKEN_URL,
+            headers={"x-api-key": API_KEY},
+            timeout=10
+        )
+        response.raise_for_status()
+
+        data = response.json()
+
+        token = data["access_token"]
+        expires_in_raw = data.get("expires_in", "1h")
+        expires_in_seconds = _parse_expires_in(expires_in_raw)
+
+        _token_cache["access_token"] = token
+        _token_cache["expires_at"] = now + expires_in_seconds
+
+        return token
 
 # Init Vertex
 vertexai.init(project=PROJECT_ID, location=LOCATION)
@@ -77,24 +149,95 @@ def get_department_by_userquery(user_query: str) -> dict:
 
 
 @mcp.tool()
-def get_doctors_by_department_tool(department_id: str) -> dict:
+def get_doctors_by_department(department_id: str) -> dict:
     """
     Fetch list of doctors for a given department ID.
+    MCP Tool: Fetch doctors for a department ID
     """
-    return get_doctors_by_department(department_id)
+    token = get_access_token()
+
+    response = requests.post(
+        DOCTOR_LIST_URL,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        },
+        json={"deptid": department_id},
+        timeout=10
+    )
+
+    response.raise_for_status()
+    doctors = response.json().get("data", [])
+
+    # Normalize response (VERY IMPORTANT for agent)
+    normalized = []
+    for d in doctors:
+        normalized.append({
+            "doctor_id": d["id"],
+            "name": f'{d["prefix"]}{d["firstname"]} {d["lastname"]}'.strip(),
+            "education": d["education"],
+            "specialization": d["specialization"],
+            "department": d["department"]
+        })
+
+    return {
+        "department_id": department_id,
+        "total_doctors": len(normalized),
+        "doctors": normalized
+    }
 
 
 @mcp.tool()
-def get_doctor_schedule_tool(
-    doctor_id: str,
-    start_date: str | None = None
-) -> dict:
+def get_doctor_schedule(doctor_id: str,start_date: str | None = None) -> dict:
     """
     Fetch available appointment slots for a doctor.
+    MCP Tool: Fetch available slots for a doctor (today + next 2 days)
     """
-    return get_doctor_schedule(doctor_id, start_date)
 
+    if not start_date:
+        start_date = datetime.utcnow().strftime("%Y-%m-%d")
 
+    token = get_access_token()
+
+    response = requests.post(
+        SCHEDULE_URL,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        },
+        json={
+            "doctorId": int(doctor_id),
+            "startDate": start_date
+        },
+        timeout=10
+    )
+
+    response.raise_for_status()
+    data = response.json()
+
+    slot_duration = data.get("slotDurationMinutes", 0)
+    raw_schedule = data.get("data", {})
+
+    available_schedule = {}
+
+    for date, slots in raw_schedule.items():
+        free_slots = [
+            {
+                "from": s["from"],
+                "to": s["to"]
+            }
+            for s in slots
+            if not s.get("booked", True)
+        ]
+
+        if free_slots:
+            available_schedule[date] = free_slots
+
+    return {
+        "doctor_id": doctor_id,
+        "slot_duration_minutes": slot_duration,
+        "available_dates": available_schedule
+    }
 # -----------------------------------------------------------------------------
 # SSE ENDPOINT (CRITICAL)
 # -----------------------------------------------------------------------------
