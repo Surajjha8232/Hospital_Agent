@@ -23,7 +23,7 @@ load_dotenv(os.path.join(BASEDIR, ".env"))
 toolset = MCPToolset(
     connection_params=SseConnectionParams(
         # local
-        url="http://localhost:3333/sse"
+        url="http://localhost:8080/sse"
 
         # cloud run
         # url="https://hospital-mcp-server-329414521619.us-central1.run.app/sse"

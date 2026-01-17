@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 import os
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 import psycopg2
 from datetime import datetime, timedelta, date
 import calendar
