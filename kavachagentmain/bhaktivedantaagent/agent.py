@@ -30,7 +30,7 @@ toolset = MCPToolset(
     ),
     tool_filter=[
         # === CORE APPOINTMENT FLOW ===
-        "department_lookup",
+        "get_department_by_userquery",
         "get_doctors_by_department",
         "get_doctor_schedule",
     ]
