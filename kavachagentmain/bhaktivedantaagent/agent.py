@@ -23,7 +23,7 @@ load_dotenv(os.path.join(BASEDIR, ".env"))
 toolset = MCPToolset(
     connection_params=SseConnectionParams(
         # local
-        url="http://localhost:8080/sse"
+        url="http://localhost:3333/sse"
 
         # cloud run
         # url="https://hospital-mcp-server-329414521619.us-central1.run.app/sse"
@@ -95,6 +95,62 @@ STEP 3 — SLOT SELECTION
 - Ask user to select a date and time.
 
 ================================================================================
+RESPONSE FORMAT RULES (MANDATORY)
+================================================================================
+
+You MUST ALWAYS respond in valid JSON.
+Never respond with plain text alone.
+
+Your response MUST follow ONE of the formats below.
+
+----------------------------------------
+FORMAT 1 — TEXT ONLY
+----------------------------------------
+{
+  "reply_type": "text",
+  "message": "<user-facing message>"
+}
+
+----------------------------------------
+FORMAT 2 — INTERACTIVE LIST ONLY
+----------------------------------------
+{
+  "reply_type": "interactive_list",
+  "header": "<short header>",
+  "body": "<instructional text>",
+  "button": "<button label>",
+  "context": "<context identifier>",
+  "items": [
+    {
+      "id": "<stable_selection_id>",
+      "title": "<short title>",
+      "description": "<optional description>"
+    }
+  ]
+}
+
+----------------------------------------
+FORMAT 3 — TEXT WITH INTERACTIVE (MOST COMMON)
+----------------------------------------
+{
+  "reply_type": "text_with_interactive",
+  "message": "<introductory or explanatory text>",
+  "interactive": {
+    "header": "<short header>",
+    "body": "<instructional text>",
+    "button": "<button label>",
+    "context": "<context identifier>",
+    "items": [
+      {
+        "id": "<stable_selection_id>",
+        "title": "<short title>",
+        "description": "<optional description>"
+      }
+    ]
+  }
+}
+
+================================================================================
 LANGUAGE & TONE
 ================================================================================
 - Always greet first:
@@ -115,13 +171,15 @@ ERROR HANDLING
   “Please give me a moment, I’m fetching the correct details for you.”
 
 ================================================================================
-IMPORTANT RESTRICTIONS
+IMPORTANT RULES
 ================================================================================
 - Do NOT guess departments.
 - Do NOT skip confirmation.
 - Do NOT ask multiple unrelated questions at once.
 - Do NOT hallucinate availability.
-
+- IDs must be stable and reusable (e.g., doctor_65, dept_27)
+- Context must describe what the user is selecting
+- Use interactive lists whenever the user must choose 
 ================================================================================
 """,
 

@@ -22,7 +22,7 @@ from datetime import datetime
 mcp = FastMCP(
     name="hospital_mcp_server",
     host="0.0.0.0",
-    port=int(os.getenv("PORT", "8080"))
+    port=int(os.getenv("PORT", "3333"))
 )
 
 app = FastAPI(title="Hospital MCP Server")
