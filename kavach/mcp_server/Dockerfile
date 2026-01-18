@@ -22,5 +22,5 @@ ENV PYTHONUNBUFFERED=1
 ENV PORT=8080
 
 # Run the server
-CMD ["python", "mcp_hospital.py"]
+CMD ["python", "mcpserver.py"]
 

@@ -3,7 +3,7 @@ $Region = "us-central1"
 
 # Environment variables from kavach/mcp_server/.env
 # NOTE: Ensure these values are correct and the database is accessible from Cloud Run (public IP or Cloud SQL)
-$EnvVars = "PROJECT_ID=trans-opus-484315-h8,LOCATION=us-central1,REASONING_ENGINE_ID=5049575320282202112,VERIFY_TOKEN=kumarai_secret_token1,ACCESS_TOKEN=EAAfzY7SMj7sBQGdNDRGR3ZAy0YaMs3uKPU1t28lqr8SPDZAI12cCSeyjWQUe4W8EVlLTV2UZCF0r0fCvXtUxcM2azMBogZAx5YjnDZAUmdFOFNGHyYqhgsuJHQuL0NTUfaicGGJSZB7GqUmaVagV8eBoYvphkUzUFgOT5hSbQV72tEuWW44vAfWx5g1wEI12qx9xZC0ZByZAvTVOLpezeGh2XszZBo6FkHbroXDLi0,PHONE_NUMBER_ID=882432748290487,ADK_BASE_URL=https://hospital-agent-329414521619.us-central1.run.app, APP_NAME=kavachagent"
+$EnvVars = "PROJECT_ID=trans-opus-484315-h8,LOCATION=us-central1,REASONING_ENGINE_ID=5049575320282202112,VERIFY_TOKEN=kumarai_secret_token1,ACCESS_TOKEN=EAAfzY7SMj7sBQGdNDRGR3ZAy0YaMs3uKPU1t28lqr8SPDZAI12cCSeyjWQUe4W8EVlLTV2UZCF0r0fCvXtUxcM2azMBogZAx5YjnDZAUmdFOFNGHyYqhgsuJHQuL0NTUfaicGGJSZB7GqUmaVagV8eBoYvphkUzUFgOT5hSbQV72tEuWW44vAfWx5g1wEI12qx9xZC0ZByZAvTVOLpezeGh2XszZBo6FkHbroXDLi0,PHONE_NUMBER_ID=882432748290487,ADK_BASE_URL=https://hospital-agent-new-368264317554.us-central1.run.app, APP_NAME=bhaktivedantaagent"
 
 
 Write-Host "Deploying $ProjectName to Cloud Run in $Region..."

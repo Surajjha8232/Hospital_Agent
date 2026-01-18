@@ -1,5 +1,3 @@
-# mcp/server.py
-
 import faiss
 import pickle
 import numpy as np
@@ -8,35 +6,43 @@ from vertexai.preview.language_models import TextEmbeddingModel
 import os
 from fastapi import FastAPI
 from fastmcp import FastMCP
-# from department_lookup import department_lookup
-# from doctor_lookup import get_doctors_by_department
-# from schedule_lookup import get_doctor_schedule
-# from auth import get_access_token
 import requests
 import time
+from typing import Optional
 from threading import Lock
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import uuid
 from google.cloud import firestore
+from dotenv import load_dotenv
+
+BASEDIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(BASEDIR, '.env'))
 
 
-db = firestore.Client(project="trans-opus-484315-h8",database="hospital-db")
 # -----------------------------------------------------------------------------
 # Create MCP Server
 # -----------------------------------------------------------------------------
-mcp = FastMCP(
-    name="hospital_mcp_server",
-    host="0.0.0.0",
-    port=int(os.getenv("PORT", "3333"))
-)
 
-app = FastAPI(title="Hospital MCP Server")
+mcp = FastMCP("hospital_mcp_server", host="0.0.0.0", port=int(os.getenv("PORT", "8080")))
+app = FastAPI()
 
 
-PROJECT_ID = "trans-opus-484315-h8"
-LOCATION = "us-central1"
-EMBEDDING_MODEL = "text-embedding-004"
+PROJECT_ID = os.getenv("PROJECT_ID")
+LOCATION = os.getenv("LOCATION")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
+DATABASE = os.getenv("DATABASE")
 
+db = firestore.Client(project=PROJECT_ID,database=DATABASE)
+# Init Vertex
+vertexai.init(project=PROJECT_ID, location=LOCATION)
+embedding_model = TextEmbeddingModel.from_pretrained(EMBEDDING_MODEL)
+
+# Load FAISS index + metadata
+index = faiss.read_index("dept.index")
+
+with open("dept_meta.pkl", "rb") as f:
+    DEPT_META = pickle.load(f) 
 
 DOCTOR_LIST_URL = (
     "https://wellness.bhaktivedantahospital.com/"
@@ -48,7 +54,7 @@ SCHEDULE_URL = (
 )
 
 TOKEN_URL = "https://wellness.bhaktivedantahospital.com/appointmentApi/apptapi/token"
-API_KEY = "mpzqo-yAQB_5IygHeqwrDFoH_r3VQu6ZXV66kMb9pG4"
+API_KEY = os.getenv("API_KEY")
 
 _token_cache = {
     "access_token": None,
@@ -106,32 +112,33 @@ def get_access_token() -> str:
 
         return token
 
-# Init Vertex
-vertexai.init(project=PROJECT_ID, location=LOCATION)
-embedding_model = TextEmbeddingModel.from_pretrained(EMBEDDING_MODEL)
-
-# Load FAISS index + metadata
-index = faiss.read_index("dept.index")
-
-with open("dept_meta.pkl", "rb") as f:
-    DEPT_META = pickle.load(f)
-
-
-# -----------------------------------------------------------------------------
-# MCP TOOLS
-# -----------------------------------------------------------------------------
 
 @mcp.tool()
-def get_department_by_userquery(user_query: str) -> dict:
+def get_current_datetime() -> dict:
     """
-    Find the most relevant hospital department based on user symptoms or query.
-    MCP Tool: Find best matching department from free-text query
+    MCP Tool: Returns the current date and time in IST.
+    This tool is the authoritative source of current time.
+    """
+
+    now_ist = datetime.now(ZoneInfo("Asia/Kolkata"))
+
+    return {
+        "date": now_ist.strftime("%Y-%m-%d"),
+        "time": now_ist.strftime("%H:%M:%S"),
+        "year": now_ist.year,
+        "timezone": "Asia/Kolkata"
+    }
+
+
+@mcp.tool()
+def department_lookup(user_query: str, top_k: int = 5):
+    """
+    MCP Tool: Resolve user query to department intent
     """
 
     # 1. Embed user query
-    top_k = 3
     embedding = embedding_model.get_embeddings([user_query])[0].values
-    vector = np.array([embedding]).astype("float32")
+    vector = np.array([embedding], dtype="float32")
     faiss.normalize_L2(vector)
 
     # 2. Search FAISS
@@ -139,6 +146,8 @@ def get_department_by_userquery(user_query: str) -> dict:
 
     results = []
     for score, idx in zip(scores[0], indices[0]):
+        if idx == -1:
+            continue
         dept = DEPT_META[idx]
         results.append({
             "department_id": dept["id"],
@@ -148,10 +157,8 @@ def get_department_by_userquery(user_query: str) -> dict:
 
     return {
         "query": user_query,
-        "best_match": results[0],
-        "alternatives": results[1:]
+        "best_match": results
     }
-
 
 @mcp.tool()
 def get_doctors_by_department(department_id: str) -> dict:
@@ -193,15 +200,14 @@ def get_doctors_by_department(department_id: str) -> dict:
 
 
 @mcp.tool()
-def get_doctor_schedule(doctor_id: str,start_date: str | None = None) -> dict:
+def get_doctor_schedule(doctor_id: str, start_date: str = "") -> dict:
     """
     Fetch available appointment slots for a doctor.
     MCP Tool: Fetch available slots for a doctor (today + next 2 days)
     """
 
     if not start_date:
-        start_date = datetime.utcnow().strftime("%Y-%m-%d")
-
+        start_date = datetime.now(ZoneInfo("Asia/Kolkata")).strftime("%Y-%m-%d")
     token = get_access_token()
 
     response = requests.post(
@@ -243,7 +249,6 @@ def get_doctor_schedule(doctor_id: str,start_date: str | None = None) -> dict:
         "slot_duration_minutes": slot_duration,
         "available_dates": available_schedule
     }
-
 
 @mcp.tool()
 def store_confirmed_appointment_tool(
@@ -307,29 +312,7 @@ def store_confirmed_appointment_tool(
         "status": "success",
         "appointment_id": appointment_id
     }
-# -----------------------------------------------------------------------------
-# SSE ENDPOINT (CRITICAL)
-# -----------------------------------------------------------------------------
-
-# @app.get("/sse")
-# async def sse():
-#     """
-#     SSE endpoint required by ADK MCPToolset
-#     """
-#     return await mcp.handle_sse()
 
 
-# -----------------------------------------------------------------------------
-# Health Check (optional but recommended)
-# -----------------------------------------------------------------------------
-
-# @app.get("/health")
-# def health():
-#     return {"status": "ok"}
-
-
-# =============================================================================
-# Run MCP Server
-# =============================================================================
 if __name__ == "__main__":
     mcp.run(transport="sse")

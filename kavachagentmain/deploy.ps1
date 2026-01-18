@@ -1,10 +1,10 @@
-$ProjectName = "hospital-agent"
+$ProjectName = "hospital-agent-new"
 $Region = "us-central1"
 
 
 # Environment variables from kavach/mcp_server/.env
 # NOTE: Ensure these values are correct and the database is accessible from Cloud Run (public IP or Cloud SQL)
-$EnvVars = "PROJECT_ID=kumaraiagent,LOCATION=us-central1,GOOGLE_GENAI_USE_VERTEXAI=1,API_KEY=AIzaSyAbbE903H9dNsHz_f63O4Ezz2DbnHEQET8"
+$EnvVars = "PROJECT_ID=trans-opus-484315-h8,LOCATION=us-central1,GOOGLE_GENAI_USE_VERTEXAI=1,API_KEY=AIzaSyD3kEVgfsAsGVN1YAnLfseNziEZCL7wJt8"
 
 Write-Host "Deploying $ProjectName to Cloud Run in $Region..."
 Write-Host "Using environment variables: $EnvVars"
