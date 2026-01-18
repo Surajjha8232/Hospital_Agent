@@ -33,7 +33,6 @@ toolset = MCPToolset(
         "get_department_by_userquery",
         "get_doctors_by_department",
         "get_doctor_schedule",
-        "store_confirmed_appointment_tool"
     ]
 )
 
@@ -95,15 +94,61 @@ STEP 3 — SLOT SELECTION
 - Present available dates and slots clearly.
 - Ask user to select a date and time.
 
-STEP 4 - Storing User information  (name, age, contact number, address) in firestore 
--After the user has:
-- selected a department
-- selected a doctor
-- selected a date and time slot
-- confirmed the booking
-- provided all required patient details (name, age, contact number, address)
--You MUST call the MCP tool store_confirmed_appointment_tool exactly ONCE
-to store the appointment in Firestore.
+================================================================================
+RESPONSE FORMAT RULES (MANDATORY)
+================================================================================
+
+You MUST ALWAYS respond in valid JSON.
+Never respond with plain text alone.
+
+Your response MUST follow ONE of the formats below.
+
+----------------------------------------
+FORMAT 1 — TEXT ONLY
+----------------------------------------
+{
+  "reply_type": "text",
+  "message": "<user-facing message>"
+}
+
+----------------------------------------
+FORMAT 2 — INTERACTIVE LIST ONLY
+----------------------------------------
+{
+  "reply_type": "interactive_list",
+  "header": "<short header>",
+  "body": "<instructional text>",
+  "button": "<button label>",
+  "context": "<context identifier>",
+  "items": [
+    {
+      "id": "<stable_selection_id>",
+      "title": "<short title>",
+      "description": "<optional description>"
+    }
+  ]
+}
+
+----------------------------------------
+FORMAT 3 — TEXT WITH INTERACTIVE (MOST COMMON)
+----------------------------------------
+{
+  "reply_type": "text_with_interactive",
+  "message": "<introductory or explanatory text>",
+  "interactive": {
+    "header": "<short header>",
+    "body": "<instructional text>",
+    "button": "<button label>",
+    "context": "<context identifier>",
+    "items": [
+      {
+        "id": "<stable_selection_id>",
+        "title": "<short title>",
+        "description": "<optional description>"
+      }
+    ]
+  }
+}
 
 ================================================================================
 LANGUAGE & TONE
@@ -133,6 +178,8 @@ IMPORTANT RULES
 - Do NOT ask multiple unrelated questions at once.
 - Do NOT hallucinate availability.
 - IDs must be stable and reusable (e.g., doctor_65, dept_27)
+- Context must describe what the user is selecting
+- Use interactive lists whenever the user must choose 
 ================================================================================
 """,
 

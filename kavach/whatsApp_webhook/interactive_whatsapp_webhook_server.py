@@ -52,7 +52,7 @@ async def get_or_create_session(user_id: str) -> str:
 def truncate(text: str, max_len: int) -> str:
     if not text:
         return ""
-    return text if len(text) <= max_len else text[: max_len - 1] + "…"
+    return text if len(text) <= max_len else text[: max_len - 3].rstrip() + "…"
 
 def extract_user_message(message: dict) -> str:
     msg_type = message.get("type")
@@ -65,6 +65,23 @@ def extract_user_message(message: dict) -> str:
     if msg_type == "interactive":
         interactive = message.get("interactive", {})
         itype = interactive.get("type")
+
+        if itype == "list_reply":
+            reply = interactive.get("list_reply", {})
+            reply_id = reply.get("id", "")
+
+            if reply_id.startswith("page_"):
+                return json.dumps({
+                    "selection_type": "pagination",
+                    "page": int(reply_id.split("_")[1])
+                })
+
+            return json.dumps({
+                "selection_type": "list",
+                "id": reply_id,
+                "title": reply.get("title"),
+                "description": reply.get("description")
+            })
 
         if itype == "list_reply":
             reply = interactive.get("list_reply", {})
@@ -271,13 +288,13 @@ def send_whatsapp_message(to: str, message: str):
     return response.json()
 
 # 4. Helper function to send interactive list using WhatsApp Cloud API
-def send_whatsapp_interactive_list(to: str, interactive: dict):
+def send_whatsapp_interactive_list_older(to: str, interactive: dict):
     url = f"https://graph.facebook.com/v20.0/{PHONE_NUMBER_ID}/messages"
     headers = {
         "Authorization": f"Bearer {ACCESS_TOKEN}",
         "Content-Type": "application/json"
     }
-
+    
     rows = [
         {
             "id": item["id"],
@@ -315,6 +332,73 @@ def send_whatsapp_interactive_list(to: str, interactive: dict):
     response = requests.post(url, headers=headers, json=payload)
     print("Interactive send response:", response.json())
 
+def send_whatsapp_interactive_list(
+    to: str,
+    interactive: dict,
+    page: int = 0,
+    page_size: int = 9  # keep 1 slot for "Next"
+):
+    """
+    Sends a paginated WhatsApp interactive list message.
+    """
+
+    url = f"https://graph.facebook.com/v20.0/{PHONE_NUMBER_ID}/messages"
+    headers = {
+        "Authorization": f"Bearer {ACCESS_TOKEN}",
+        "Content-Type": "application/json"
+    }
+
+    items = interactive.get("items", [])
+
+    start = page * page_size
+    end = start + page_size
+    page_items = items[start:end]
+
+    rows = [
+        {
+            "id": item["id"],
+            "title": truncate(item["title"], 24),
+            "description": truncate(item.get("description", ""), 72)
+        }
+        for item in page_items
+    ]
+
+    # ➕ Add pagination row if more items exist
+    if end < len(items):
+        rows.append({
+            "id": f"page_{page + 1}",
+            "title": "➡️ View more",
+            "description": "Show more options"
+        })
+
+    payload = {
+        "messaging_product": "whatsapp",
+        "to": to,
+        "type": "interactive",
+        "interactive": {
+            "type": "list",
+            "header": {
+                "type": "text",
+                "text": truncate(interactive.get("header", ""), 60)
+            },
+            "body": {
+                "text": truncate(interactive.get("body", ""), 1024)
+            },
+            "action": {
+                "button": truncate(interactive.get("button", "Select"), 20),
+                "sections": [
+                    {
+                        "title": "Options",
+                        "rows": rows
+                    }
+                ]
+            }
+        }
+    }
+
+    response = requests.post(url, headers=headers, json=payload)
+    print("Interactive send response:", response.json())
+    return response.json()
 
 
 # 5. Optional test endpoint to manually send messages

@@ -16,6 +16,11 @@ import requests
 import time
 from threading import Lock
 from datetime import datetime
+import uuid
+from google.cloud import firestore
+
+
+db = firestore.Client(project="trans-opus-484315-h8",database="hospital-db")
 # -----------------------------------------------------------------------------
 # Create MCP Server
 # -----------------------------------------------------------------------------
@@ -237,6 +242,70 @@ def get_doctor_schedule(doctor_id: str,start_date: str | None = None) -> dict:
         "doctor_id": doctor_id,
         "slot_duration_minutes": slot_duration,
         "available_dates": available_schedule
+    }
+
+
+@mcp.tool()
+def store_confirmed_appointment_tool(
+    patient_name: str,
+    patient_age: int,
+    patient_contact: str,
+    patient_address: str,
+    doctor_id: str,
+    doctor_name: str,
+    department_id: str,
+    department_name: str,
+    appointment_date: str,
+    appointment_time: str,
+    slot_duration_minutes: int,
+    whatsapp_number: str
+) -> dict:
+    """
+    Stores confirmed appointment details in Firestore.
+    """
+    try:
+        appointment_id = f"apt_{uuid.uuid4().hex[:8]}"
+
+        doc = {
+            "appointment_id": appointment_id,
+            "status": "CONFIRMED",
+
+            "patient": {
+                "name": patient_name,
+                "age": patient_age,
+                "contact_number": patient_contact,
+                "address": patient_address
+            },
+
+            "doctor": {
+                "doctor_id": doctor_id,
+                "doctor_name": doctor_name,
+                "department_id": department_id,
+                "department_name": department_name
+            },
+
+            "slot": {
+                "date": appointment_date,
+                "time": appointment_time,
+                "duration_minutes": slot_duration_minutes
+            },
+
+        "source": "whatsapp",
+        "whatsapp_number": whatsapp_number,
+        "created_at": datetime.utcnow().isoformat()
+        }
+
+        db.collection("appointments").document(appointment_id).set(doc)
+    
+    except Exception as e:
+        return {
+            "status": "error",
+             "message": "Unable to store appointment at this moment. Please try again.",
+        }
+
+    return {
+        "status": "success",
+        "appointment_id": appointment_id
     }
 # -----------------------------------------------------------------------------
 # SSE ENDPOINT (CRITICAL)
