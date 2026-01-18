@@ -3,4 +3,5 @@ deploy.ps1
 __pycache__
 *.pyc
 .adk/
-
+kavachagent/
+requirements_latest.txt

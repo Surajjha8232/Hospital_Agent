@@ -4,7 +4,7 @@ import json
 import tempfile
 import os
 
-PROJECT = "kumaraiagent"
+PROJECT = "trans-opus-484315-h8"
 REGION = "us-central1"
 INDEX_ID = "2170921937369300992"
 BUCKET = "kumarai-dept-vectors"
