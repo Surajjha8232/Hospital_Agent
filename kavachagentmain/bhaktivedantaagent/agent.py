@@ -28,14 +28,15 @@ load_dotenv(os.path.join(BASEDIR, '.env'))
 # -----------------------------------------------------------------------------
 toolset = MCPToolset(
     connection_params=SseConnectionParams(
-        # url="http://localhost:8000/sse"
-        url="https://hospital-mcp-server-new-368264317554.us-central1.run.app/sse"
+        url="http://localhost:8080/sse"
+        #url="https://hospital-mcp-server-new-368264317554.us-central1.run.app/sse"
     ),
     tool_filter=[
        "department_lookup",
        "get_doctors_by_department",
        "get_doctor_schedule",
        "get_current_datetime", 
+       "get_patient_by_whatsapp",
        "store_confirmed_appointment_tool"
     ]
 )
@@ -91,6 +92,7 @@ If the user provides:
 The assistant MUST first call `get_current_datetime` to determine the current date and year in IST before resolving the date.
 
 The assistant must NEVER guess or assume a calendar year on its own.
+
 
 
 ================================================================================
@@ -150,6 +152,22 @@ When the user selects a doctor or asks for availability:
 If no slots are available:
 - Inform the user gently.
 - Offer to check another doctor or department.
+
+================================================================================
+                       PATIENT IDENTIFICATION RULE
+================================================================================
+
+- When patient details are required for booking or confirmation:
+  → Call get_patient_by_whatsapp
+- NEVER ask the user for their mobile number.
+- The WhatsApp number is automatically available via the session user_id.
+- If multiple patient records are returned:
+  → Ask the user to select one.
+- If only one patient record is found:
+  → Use it automatically and proceed.
+- If no patient record is found:
+  → Proceed with new patient creation.
+
 
 ================================================================================
                         PATIENT DETAILS COLLECTION

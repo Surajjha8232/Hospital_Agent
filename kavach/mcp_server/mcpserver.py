@@ -45,14 +45,18 @@ with open("dept_meta.pkl", "rb") as f:
     DEPT_META = pickle.load(f) 
 
 DOCTOR_LIST_URL = (
-    "https://wellness.bhaktivedantahospital.com/"
-    "appointmentApi/apptapi/data/doctorlist"
+    "https://wellness.bhaktivedantahospital.com/appointmentApi/apptapi/data"
+    "/doctorlist"
 )
 SCHEDULE_URL = (
-    "https://wellness.bhaktivedantahospital.com/"
-    "appointmentApi/apptapi/data/doctorschedule"
+    "https://wellness.bhaktivedantahospital.com/appointmentApi/apptapi/data"
+    "/doctorschedule"
 )
 
+PATIENT_URL = (
+    "https://wellness.bhaktivedantahospital.com/appointmentApi/apptapi/data"
+    "/patientbymobile"
+)
 TOKEN_URL = "https://wellness.bhaktivedantahospital.com/appointmentApi/apptapi/token"
 API_KEY = os.getenv("API_KEY")
 
@@ -128,6 +132,51 @@ def get_current_datetime() -> dict:
         "year": now_ist.year,
         "timezone": "Asia/Kolkata"
     }
+
+@mcp.tool()
+def get_patient_by_whatsapp(__user_id__: str) -> dict:
+    """
+    Fetch patient records using WhatsApp number.
+    The WhatsApp number is derived from ADK session user_id.
+    """
+
+    try:
+        # WhatsApp sends country code, hospital API expects 10 digits
+        print("User Id ",__user_id__)
+        mobile = __user_id__[-10:]
+        print("User WhatsApp No",mobile)
+        token = get_access_token()
+        response = requests.post(
+            PATIENT_URL,
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json"
+            },
+            json={"mobile": mobile},
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        data = response.json()
+
+        if not data.get("success") or data.get("count", 0) == 0:
+            return {
+                "status": "not_found",
+                "message": "No existing patient records were found for your mobile number."
+            }
+
+        return {
+            "status": "success",
+            "total_records": data["count"],
+            "patients": data["data"]
+        }
+
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": "I’m sorry, I couldn’t retrieve your patient details at the moment. Please try again shortly."
+        }
 
 
 @mcp.tool()
