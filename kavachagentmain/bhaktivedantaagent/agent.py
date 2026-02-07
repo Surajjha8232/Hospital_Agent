@@ -10,6 +10,12 @@ from zoneinfo import ZoneInfo
 from google.adk.agents import Agent
 from google.adk.tools.mcp_tool.mcp_toolset import MCPToolset, SseConnectionParams
 from datetime import datetime
+from pydantic_core import core_schema
+from google.adk.tools import ToolContext,BaseTool
+from typing import Any, Dict
+# ToolContext.__get_pydantic_core_schema__ = classmethod(
+#     lambda cls, source_type, handler: core_schema.any_schema()
+# )
 
 # === Setup Logging ===
 logging.basicConfig(
@@ -22,6 +28,17 @@ logger.info("Agent module initializing...")
 BASEDIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASEDIR, '.env'))
 
+# 1. This function "intercepts" the tool call
+
+async def inject_user_id(tool: BaseTool, args: dict[str, Any], tool_context: ToolContext):
+    # List of tools that require the secure session user_id
+    secure_tools = ["remember_whatsapp_number", "get_patient_by_whatsapp"]
+    
+    if tool.name in secure_tools or "user_id" in args:
+        # Pull the ID that you passed to runner.run_async()
+        args["user_id"] = tool_context._invocation_context.session.user_id
+    
+    return None
 
 # -----------------------------------------------------------------------------
 # Connect to MCP Hospital Server Tools
@@ -32,12 +49,14 @@ toolset = MCPToolset(
         #url="https://hospital-mcp-server-new-368264317554.us-central1.run.app/sse"
     ),
     tool_filter=[
+      "remember_whatsapp_number",
+       "get_patient_by_whatsapp",
        "department_lookup",
        "get_doctors_by_department",
        "get_doctor_schedule",
        "get_current_datetime", 
-       "get_patient_by_whatsapp",
-       "store_confirmed_appointment_tool"
+       "store_confirmed_appointment_tool",
+       
     ]
 )
 
@@ -52,7 +71,14 @@ root_agent = Agent(
     instruction="""
 You are the Bhaktivedanta Hospital Assistant, an enquiry-focused AI assistant connected to hospital systems through MCP tools.
 
+At the start of every new conversation, the assistant must initialize the session and identify the user.
+  Immediately call:
+  → remember_whatsapp_number()
+  Then call:
+  → get_patient_by_whatsapp()
+
 Your role is to provide a warm, polite, caring, and highly professional experience while helping users:
+- Identify user whatsapp number and get the patient data 
 - Identify the correct medical department based on symptoms
 - Explore doctors available in that department
 - View real-time doctor availability (today + next 2 days)
@@ -160,7 +186,7 @@ If no slots are available:
 - When patient details are required for booking or confirmation:
   → Call get_patient_by_whatsapp
 - NEVER ask the user for their mobile number.
-- The WhatsApp number is automatically available via the session user_id.
+- The WhatsApp number is automatically available via the session userId.
 - If multiple patient records are returned:
   → Ask the user to select one.
 - If only one patient record is found:
@@ -268,6 +294,7 @@ ECG → ₹700
     tools=[ 
         toolset
     ],
+    before_tool_callback=inject_user_id,
 )
 
 root_agent = root_agent

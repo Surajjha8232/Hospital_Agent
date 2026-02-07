@@ -19,7 +19,6 @@ from dotenv import load_dotenv
 BASEDIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASEDIR, '.env'))
 
-
 # -----------------------------------------------------------------------------
 # Create MCP Server
 # -----------------------------------------------------------------------------
@@ -66,6 +65,8 @@ _token_cache = {
 }
 
 _lock = Lock()
+
+
 
 def _parse_expires_in(expires_in: str) -> int:
     """
@@ -133,19 +134,40 @@ def get_current_datetime() -> dict:
         "timezone": "Asia/Kolkata"
     }
 
+
 @mcp.tool()
-def get_patient_by_whatsapp(__user_id__: str) -> dict:
+def remember_whatsapp_number(user_id: str) -> str:
     """
-    Fetch patient records using WhatsApp number.
-    The WhatsApp number is derived from ADK session user_id.
+    Identifies the user's WhatsApp number.
+    Args:
+        user_id: The unique WhatsApp ID of the user.
+    """
+    # Accessing identifiers from the context
+    # user_id = context._invocation_context.session.user_id
+    # session_id = context._invocation_context.session.id
+    
+    print(f"Received WhatsApp ID: {user_id}")
+    return f"I've identified your WhatsApp number as: {user_id}."
+
+@mcp.tool()
+def get_patient_by_whatsapp(user_id: str) -> dict:
+    """
+    Fetch patient records using stored WhatsApp number from session memory.
     """
 
     try:
-        # WhatsApp sends country code, hospital API expects 10 digits
-        print("User Id ",__user_id__)
-        mobile = __user_id__[-10:]
-        print("User WhatsApp No",mobile)
+        mobile_full = user_id
+
+        if not mobile_full:
+            return {
+                "status": "error",
+                "message": "User WhatsApp number not available."
+            }
+
+        mobile = mobile_full[-10:]
+
         token = get_access_token()
+
         response = requests.post(
             PATIENT_URL,
             headers={
@@ -157,27 +179,41 @@ def get_patient_by_whatsapp(__user_id__: str) -> dict:
         )
 
         response.raise_for_status()
-
         data = response.json()
 
         if not data.get("success") or data.get("count", 0) == 0:
             return {
                 "status": "not_found",
-                "message": "No existing patient records were found for your mobile number."
+                "message": "No patient record found."
             }
 
         return {
             "status": "success",
-            "total_records": data["count"],
             "patients": data["data"]
         }
 
-    except Exception as e:
+    except Exception:
         return {
             "status": "error",
-            "message": "I’m sorry, I couldn’t retrieve your patient details at the moment. Please try again shortly."
+            "message": "Unable to fetch patient details."
         }
 
+
+
+# def fetch_patient_history(tool_context: IgnoredContext) -> str:
+#     """
+#     Fetches the history for the currently logged-in patient.
+#     """
+#     # Accessing identifiers from the context
+#     user_id = tool_context._invocation_context.session.user_id
+#     session_id = tool_context._invocation_context.session.id
+    
+#     print(f"Fetching data for User: {user_id} in Session: {session_id}")
+    
+#     # Now you can use user_id to query your database/API
+#     # data = my_api.get_history(patient_id=user_id)
+    
+#     return f"User WhatsApp No {user_id}."
 
 @mcp.tool()
 def department_lookup(user_query: str, top_k: int = 5):
