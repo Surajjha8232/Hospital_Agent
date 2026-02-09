@@ -56,6 +56,12 @@ PATIENT_URL = (
     "https://wellness.bhaktivedantahospital.com/appointmentApi/apptapi/data"
     "/patientbymobile"
 )
+
+HEALTH_PACKAGE_URL = (
+    "https://wellness.bhaktivedantahospital.com/appointmentApi/apptapi/data"
+    "/gethealthpackages"
+)
+
 TOKEN_URL = "https://wellness.bhaktivedantahospital.com/appointmentApi/apptapi/token"
 API_KEY = os.getenv("API_KEY")
 
@@ -134,21 +140,6 @@ def get_current_datetime() -> dict:
         "timezone": "Asia/Kolkata"
     }
 
-
-@mcp.tool()
-def remember_whatsapp_number(user_id: str) -> str:
-    """
-    Identifies the user's WhatsApp number.
-    Args:
-        user_id: The unique WhatsApp ID of the user.
-    """
-    # Accessing identifiers from the context
-    # user_id = context._invocation_context.session.user_id
-    # session_id = context._invocation_context.session.id
-    
-    print(f"Received WhatsApp ID: {user_id}")
-    return f"I've identified your WhatsApp number as: {user_id}."
-
 @mcp.tool()
 def get_patient_by_whatsapp(user_id: str) -> dict:
     """
@@ -200,20 +191,6 @@ def get_patient_by_whatsapp(user_id: str) -> dict:
 
 
 
-# def fetch_patient_history(tool_context: IgnoredContext) -> str:
-#     """
-#     Fetches the history for the currently logged-in patient.
-#     """
-#     # Accessing identifiers from the context
-#     user_id = tool_context._invocation_context.session.user_id
-#     session_id = tool_context._invocation_context.session.id
-    
-#     print(f"Fetching data for User: {user_id} in Session: {session_id}")
-    
-#     # Now you can use user_id to query your database/API
-#     # data = my_api.get_history(patient_id=user_id)
-    
-#     return f"User WhatsApp No {user_id}."
 
 @mcp.tool()
 def department_lookup(user_query: str, top_k: int = 5):
@@ -245,6 +222,7 @@ def department_lookup(user_query: str, top_k: int = 5):
         "best_match": results
     }
 
+
 @mcp.tool()
 def get_doctors_by_department(department_id: str) -> dict:
     """
@@ -274,7 +252,10 @@ def get_doctors_by_department(department_id: str) -> dict:
             "name": f'{d["prefix"]}{d["firstname"]} {d["lastname"]}'.strip(),
             "education": d["education"],
             "specialization": d["specialization"],
-            "department": d["department"]
+            "department": d["department"],
+            "years_of_experience": d["experience"],
+            "doctorrank": d["doctorrank"],
+            "doctorfees": d["doctorfees"]
         })
 
     return {
@@ -282,6 +263,7 @@ def get_doctors_by_department(department_id: str) -> dict:
         "total_doctors": len(normalized),
         "doctors": normalized
     }
+
 
 
 @mcp.tool()
@@ -335,11 +317,12 @@ def get_doctor_schedule(doctor_id: str, start_date: str = "") -> dict:
         "available_dates": available_schedule
     }
 
+
 @mcp.tool()
 def store_confirmed_appointment_tool(
     patient_name: str,
-    patient_age: int,
-    patient_contact: str,
+    patient_mrnno: str,
+    patient_age: str,
     patient_address: str,
     doctor_id: str,
     doctor_name: str,
@@ -347,13 +330,13 @@ def store_confirmed_appointment_tool(
     department_name: str,
     appointment_date: str,
     appointment_time: str,
-    slot_duration_minutes: int,
-    whatsapp_number: str
+    user_id: str
 ) -> dict:
     """
     Stores confirmed appointment details in Firestore.
     """
     try:
+        whatsapp_number = user_id[-10:]
         appointment_id = f"apt_{uuid.uuid4().hex[:8]}"
 
         doc = {
@@ -361,9 +344,10 @@ def store_confirmed_appointment_tool(
             "status": "CONFIRMED",
 
             "patient": {
-                "name": patient_name,
+                "name": patient_name, 
+                "mrnno": patient_mrnno,
                 "age": patient_age,
-                "contact_number": patient_contact,
+                "contact_number": whatsapp_number,
                 "address": patient_address
             },
 
@@ -377,12 +361,11 @@ def store_confirmed_appointment_tool(
             "slot": {
                 "date": appointment_date,
                 "time": appointment_time,
-                "duration_minutes": slot_duration_minutes
             },
 
         "source": "whatsapp",
         "whatsapp_number": whatsapp_number,
-        "created_at": datetime.utcnow().isoformat()
+        "created_at": datetime.now(ZoneInfo("Asia/Kolkata")).isoformat()
         }
 
         db.collection("appointments").document(appointment_id).set(doc)
@@ -396,6 +379,43 @@ def store_confirmed_appointment_tool(
     return {
         "status": "success",
         "appointment_id": appointment_id
+    }
+
+
+@mcp.tool()
+def get_healthcare_packages() -> dict:
+    """
+    MCP Tool: Fetch available healthcare packages.
+    Returns package code, name, rate, and service details.
+    """
+
+    token = get_access_token()
+
+    response = requests.get(
+        HEALTH_PACKAGE_URL,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json"
+        },
+        timeout=10
+    )
+
+    response.raise_for_status()
+    packages = response.json().get("data", [])
+
+    normalized = []
+    for p in packages:
+        normalized.append({
+            "package_code": p.get("pkgcode"),
+            "package_name": p.get("pkgname"),
+            "rate": p.get("pkgrate"),
+            "service_id": p.get("smid"),
+            "service_name": p.get("servicename")
+        })
+
+    return {
+        "total_packages": len(normalized),
+        "packages": normalized
     }
 
 

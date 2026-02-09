@@ -4,7 +4,7 @@ $Region = "us-central1"
 
 # Environment variables from kavach/mcp_server/.env
 # NOTE: Ensure these values are correct and the database is accessible from Cloud Run (public IP or Cloud SQL)
-$EnvVars = "PROJECT_ID=trans-opus-484315-h8,LOCATION=us-central1,GOOGLE_GENAI_USE_VERTEXAI=1,API_KEY=AIzaSyD3kEVgfsAsGVN1YAnLfseNziEZCL7wJt8"
+$EnvVars = "PROJECT_ID=trans-opus-484315-h8,LOCATION=us-central1,GOOGLE_GENAI_USE_VERTEXAI=1,API_KEY=AQ.Ab8RN6JMb5wBya0oGOOPkgdHBgmIrw9dm6qYUpCQ9pUH_kGyVw"
 
 Write-Host "Deploying $ProjectName to Cloud Run in $Region..."
 Write-Host "Using environment variables: $EnvVars"
